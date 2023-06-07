@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<!-- saved from url=(0050)https://cdn-gl.imrworldwide.com/novms/html/ls.html -->
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+		
+	</head>
+	<body>
+		<script>
+			(function (window) {
+				var ss = null, ls = null, debugLs = false, syncPingArr = [], key = window.location.search.split("=")[1],
+					postMsgAvail = (typeof (window.postMessage) == "function"),
+					isValidJson = (window.NOLCMB && window.NOLCMB.GLCFG && window.NOLCMB.GLCFG.isValidJson) ?
+						window.NOLCMB.GLCFG.isValidJson :
+						(function (val) { try { JSON.parse(val); } catch (e) { return false; } return true; });
+				try {
+					// try to set sessionStorage
+					ss = window.sessionStorage;
+				} catch (e) { /* if we get here it means that storage is disabled */ }
+				try {
+					// try to set localStorage
+					ls = window.localStorage;
+				} catch (e) { /* if we get here it means that storage is disabled */ }
+
+				var _cookie = {
+					all: function () {
+						return document.cookie;
+					},
+					get: function (name) {
+						try {
+							var match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+							return match ? match[2] : "";
+						} catch (e) { /* cookies might not be enabled */ }
+						return "";
+					}
+				};
+
+				if (window.addEventListener) {
+					window.addEventListener("message", function (evt) {
+						var passedData = handleJson({ "handler": "parse", "data": evt.data }), l_evtType;
+						if (window.document.referrer.indexOf(evt.origin) == 0 || (window.document.referrer === "" && evt.origin === "null") || (passedData && passedData.nolSentFromBsdk)) {
+							if (!passedData || !passedData.hasOwnProperty("eventType")) return;
+							l_evtType = passedData.eventType.toLowerCase();
+							if (passedData.hasOwnProperty("storageType") && passedData.storageType == "local") {
+
+								switch (l_evtType) {
+									case "get":
+										if (ls && window.location.origin.indexOf(".imrworldwide.com") !== -1) { /* only run get for imrworldwide domain */
+											var retVal = handleJson({ "handler": "parse", "data": ls.getItem(passedData.key) }) || "";
+											if (postMsgAvail)
+												evt.source.postMessage({ nolSentFromLs: true, key: passedData.key, type: "lsget", val: retVal }, (evt.origin && evt.origin !== "null" ? evt.origin : "*"));
+										} else {
+											// send message back to note that 3rd party data is disabled
+											if (postMsgAvail) {
+												evt.source.postMessage({ nolSentFromLs: true, key: passedData.key, type: "lsdisabled", val: true }, (evt.origin && evt.origin !== "null" ? evt.origin : "*"));
+											}// if
+										}// if-else
+										break;
+									case "set":
+										if (passedData.data !== "999" && ls && window.location.origin.indexOf(".imrworldwide.com") !== -1) { /* only run set for imrworldwide domain */
+											ls.setItem(passedData.key, handleJson({ "handler": "stringify", "data": passedData.data }));
+										}
+										break;
+									case "delete":
+										if (ls) {
+											ls.removeItem(passedData.key);
+										}// if
+										break;
+								}
+							} else if (passedData.hasOwnProperty("data") && passedData.data.hasOwnProperty("url") && String(passedData.data.url).length > 0) {
+								switch (l_evtType) {
+									case "maskref":
+										sendRequest(passedData.data.url)
+										break;
+									case "maskrefretry":
+											fireToUrl({
+											url: passedData.data.url,
+											type: "session",
+											currRetry: 0,
+											maxRetry: 5,
+											retryDelay: 2000
+										});
+										break;
+									case "requsingframe":
+										sendReqUsingFrame(passedData.data.url);
+										break;
+								}
+							} else if (passedData.hasOwnProperty("storageType") && passedData.storageType == "cookie") {
+								// get cookie
+								switch (l_evtType) {
+									case "get":
+										if (navigator.cookieEnabled) {
+											switch (passedData.key) {
+												case "cookieall":
+													postMsgAvail && evt.source.postMessage({ nolSentFromLs: true, key: passedData.key, type: "cookieget", val: _cookie.all() }, (evt.origin && evt.origin !== "null" ? evt.origin : "*"));
+													break;
+												case "IMRID":
+													if(window.location.origin.indexOf(".imrworldwide.com") !== -1) {
+														debugLs = passedData.debug;
+														sendSyncPing(passedData.key, passedData.data, { currRetry: 1, maxRetry: 10, retryDelay: 5000 });
+													}
+													break;
+												case "OPT_OUT":
+													var cookieVal = _cookie.get(passedData.key);
+													postMsgAvail && evt.source.postMessage({ nolSentFromLs: true, key: passedData.key, type: "cookieget", val: cookieVal }, (evt.origin && evt.origin !== "null" ? evt.origin : "*"));
+													break;
+											}
+										} else {
+											// cookies disabled for 3rd party sites - send cookie disabled msg
+											if (postMsgAvail) {
+												evt.source.postMessage({ nolSentFromLs: true, key: passedData.key, type: "cookiedisabled", val: true }, (evt.origin && evt.origin !== "null" ? evt.origin : "*"));
+											}// if
+										}// if-else
+										break;
+
+								};// switch
+							} else {
+								if (ss) {
+									//Use older session storage imp. May align this with ls logic currently used in future
+									ss[key] = handleJson({ "handler": "stringify", "data": evt.data });
+								}// if
+							}
+						}
+					}, false);
+
+					window.addEventListener("storage", onStorage, false);
+				} else if (window.attachEvent) {
+					window.attachEvent("onmessage", function (evt) {
+						if (window.document.referrer.indexOf(evt.origin) == 0 && ss) {
+							ss[key] = handleJson({ "handler": "stringify", "data": evt.data });
+						}
+					});
+
+					window.attachEvent("onstorage", onStorage);
+				}
+
+				function logMessage(type, msg) {
+					if(type && msg && window.console && window.console.log) {
+						switch(type.toLowerCase()) {
+							case "info":
+								console.log("Nielsen Log: Info -", msg);
+								break;
+							case "debug":
+								if(debugLs) {
+									console.log("Nielsen Log: Debug -", msg);
+								}
+								break;
+							case "error":
+								console.log("Nielsen Log: Error -", msg);
+								break;
+						}
+					}
+				}
+
+				function handleJson(args) {
+					var retVal = undefined;
+					if (args && typeof (args) === "object" && args.hasOwnProperty("data") && args.hasOwnProperty("handler")) {
+						switch (args.handler) {
+							case "parse":
+								retVal = (isValidJson(args.data)) ? JSON.parse(args.data) : {};
+								break;
+							case "stringify":
+								try { retVal = JSON.stringify(args.data); } catch (e) { retVal = ""; };
+								break;
+						}
+					}
+					return retVal;
+				}
+
+				/*Using the below method to fire to the emmUrl passed since the image tag does not work with the android intent handling*/
+				function sendReqUsingFrame(url) {
+
+					try {
+						if (!url) return;
+
+						var l_frame = window.document.createElement("iframe");
+						l_frame.src = url;
+						l_frame.height = 0;
+						l_frame.width = 0;
+						l_frame.style.display = "none";
+						l_frame.id = "emmframe_" + Date.now();
+						window.document.body.appendChild(l_frame);
+
+						// setting function to remove iframe if loading fails
+						var iframeClear = setTimeout(function () {
+							window.document.body.removeChild(l_frame);
+						}, 5000);
+
+						l_frame.onload = function () {
+							try {
+								//When the iframe is loaded, we know req has ben sent so delete it
+								this.parentNode.removeChild(this);
+
+								// if iframe loaded fine, clear timeout
+								if (iframeClear) {
+									clearTimeout(iframeClear);
+								}// if
+							} catch (e) {
+							}
+						};
+					} catch (e) {
+					}
+				}
+
+				function fireToUrl(args, done) {
+
+					if (typeof (args) === "undefined" ||
+						(args && (!args.hasOwnProperty("url") || args.url.length === 0) ||
+						(!args.hasOwnProperty("retryDelay")) ||
+						(!args.hasOwnProperty("currRetry")) ||
+						(!args.hasOwnProperty("maxRetry")))) { return; }
+					var req = {
+						requestUrl: function () {
+							var self = this;
+							try {
+								if (args.currRetry > args.maxRetry) {
+									if(args.type === "session") {
+										logMessage("info", "Max retry reached for sending session ping.")
+									}
+									if(args.type === "sync") {
+										logMessage("info", "Max retry reached for sending sync ping: " + args.url);
+									}
+									done && done();
+								} else {
+									self.sendUrlRequest(args.url);
+								}// if-else
+							} catch (err) {
+								logMessage("error", "Error in fireToUrl requestUrl. " + err)
+								done && done();
+							}
+						},
+						sendUrlRequest: function (url) {
+							var self = this;
+							var isSyncPing = args.type === "sync";
+								try {
+									if (typeof url === "undefined") { return; }
+									var img = new Image();
+									img.onerror = function (evt) {
+										if(isSyncPing) {
+											logMessage("debug", "Retrying to send ping: " + url + ". Retry count #" + args.currRetry);
+										}
+										args.currRetry++;
+										window.setTimeout(function () { self.requestUrl(); }, args.retryDelay);
+									};
+									img.onload = function (evt) {
+										if(isSyncPing) {
+											syncPingArr.push(url); // Keep reference of the sync pings that have already went out
+										}
+										done && done();
+									};
+									if(args.type === "session") {
+										img.src = url + "&retry=" + args.currRetry;
+									}
+									if(isSyncPing && syncPingArr.indexOf(url) === -1) {
+										img.src = url;
+									}
+								} catch (err) {
+									logMessage("error", "Error in fireToUrl sendUrlRequest. " + err);
+									done && done();
+								}
+						}
+					};
+					req.requestUrl();
+				}
+				// BRWRSDK-16480 - support for sending sync pings (remove before pushing to prod)
+				function sendSyncPing(cookieName, urls, retryObj) {
+					var cookieVal = _cookie.get(cookieName);
+					try {
+						if(cookieVal) {
+							var pingsToSend = urls.map(function(url){ return url.replace("|!nol_imrid!|", cookieVal) });
+							pingsToSend.forEach(function(ping) { return fireToUrl({ url: ping, type: "sync", currRetry: 1, maxRetry: 5, retryDelay: 5000 }) });
+						} else {
+							if(retryObj.currRetry > retryObj.maxRetry) {
+								logMessage("info", "Max retry reached for fetching cookie.")
+								return;
+							}
+							retryObj.currRetry++;
+							window.setTimeout(function() { sendSyncPing(cookieName, urls, retryObj); }, retryObj.retryDelay);
+						}
+					} catch (err) {
+						logMessage("error", "Error in sendSyncPing. " + err);
+					}
+				}
+
+				/* Using the below call to send the request via a masked url (imrworldwide) */
+				function sendRequest(url) {
+					if (!url) return;
+					var img = new Image();
+					img.onerror = function (e) {/*console.log("Error is: ", e);*/ };
+					img.onload = function (e) {/*console.log("All successful");*/ };
+					img.src = url;
+				}
+
+				function onStorage(evt) {
+					try {
+
+						var data = evt.newValue;
+						if (postMsgAvail) {
+							// changed the postMessage parameter to be the full evt object as previously the string values were getting sent and this was causing conflicts with v60 as it accepts
+							// anything that is a string from imrworldwide.com and sets it as the id. This change should not affect anything as there isn't really any feature that makes use of
+							// this postMessage callback for now. Eventually viewability would be. -BRWSRSDK - 1529
+							window.parent.postMessage({ nolSentFromLs: true, key: evt.key, type: "lsbroadcast", newValue: evt.newValue, oldValue: evt.oldValue }, (window.document.referrer ? window.document.referrer : "*"));
+
+							if (evt.key === "nol_lsid") {
+								// if lsid changed, broadcast the cookie out in case we"ve changed optout status
+								setTimeout(function () {
+									// post cookies to SDK
+									window.parent.postMessage({ nolSentFromLs: true, key: "cookieall", type: "cookieget", val: _cookie.all() }, (window.document.referrer ? window.document.referrer : "*"));
+
+								}, 2000);
+							}// if
+
+						}// if
+
+					} catch (e) {
+
+					}// try-catch
+				}
+			}(this))
+		</script>
+	
+</body><div class="XTranslate"><template shadowrootmode="closed"><style type="text/css">:host-context(.XTranslate){--flex-gap: var(--theme-spacing);--theme-content-width: 620px;--theme-color-contrast: black;--theme-bgc: white;--theme-bgc-invert: #36393e;--theme-color-primary: #942486aa;--theme-color-accent: #e85555;--theme-color-text: #87909c;--theme-color-text2: #a0a0a0;--theme-color-success: rgb(67, 160, 71);--theme-color-error: rgb(244, 67, 54);--theme-border-color: rgba(135, 144, 156, 0.5);--theme-border-radius: 3px;--theme-spacing: 10px;--theme-spacing-half: calc(var(--theme-spacing) / 2);--theme-spacing-double: calc(var(--theme-spacing) * 2);--theme-scrollbar-bgc: rgba(0, 0, 0, .25);--theme-scrollbar-size: var(--theme-spacing);all:unset;position:absolute !important;width:100% !important;left:0 !important;top:0 !important;z-index:1000000000 !important}:host-context(.XTranslate) *,:host-context(.XTranslate) *:after,:host-context(.XTranslate) *:before{box-sizing:border-box;outline:none}
+.icon-module__Icon--mJDq3{--small-size: 20px;--big-size: 32px;--color-active: black;--bgc-active: transparent;display:inline-flex;flex-shrink:0;font-style:normal;vertical-align:middle;align-items:center;justify-content:center;text-decoration:none;user-select:none;box-sizing:content-box;font-size:var(--size, 24px);width:var(--size, 24px);height:var(--size, 24px)}.icon-module__Icon--mJDq3.icon-module__small--GKI9R{font-size:var(--size, var(--small-size));width:var(--size, var(--small-size));height:var(--size, var(--small-size))}.icon-module__Icon--mJDq3.icon-module__big--TkVER{font-size:var(--size, var(--big-size));width:var(--size, var(--big-size));height:var(--size, var(--big-size))}.icon-module__Icon--mJDq3>span{width:100%;height:100%;display:inherit}.icon-module__Icon--mJDq3.icon-module__material--eODHf>span{font-family:"MaterialIcons-XTranslate";font-size:inherit;font-weight:normal;font-style:normal;display:inline-block;line-height:1;text-transform:none;letter-spacing:normal;word-wrap:normal;white-space:nowrap;direction:ltr;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;-moz-osx-font-smoothing:grayscale;font-feature-settings:"liga"}.icon-module__Icon--mJDq3.icon-module__svg--Vvipk{box-sizing:content-box}.icon-module__Icon--mJDq3.icon-module__svg--Vvipk svg{pointer-events:none;width:100%;height:100%}.icon-module__Icon--mJDq3.icon-module__svg--Vvipk:not(.icon-module__colorful--DPeih) svg *{fill:currentColor}.icon-module__Icon--mJDq3.icon-module__svg--Vvipk:not(.icon-module__colorful--DPeih) svg line{stroke:currentColor}.icon-module__Icon--mJDq3.icon-module__disabled--OQ0Qq{opacity:.5;color:inherit !important;cursor:not-allowed !important}.icon-module__Icon--mJDq3.icon-module__active--urCUL,.icon-module__Icon--mJDq3.icon-module__interactive--jiTQl:hover,.icon-module__Icon--mJDq3.icon-module__interactive--jiTQl.icon-module__focusable--l60fB:focus{color:var(--color-active);box-shadow:0 0 0 3px var(--bgc-active);background-color:var(--bgc-active)}.icon-module__Icon--mJDq3.icon-module__interactive--jiTQl{cursor:pointer;transition:250ms color,250ms opacity,150ms background-color,150ms box-shadow;border-radius:50%}:root[data-theme=dark] .icon-module__Icon--mJDq3{--color-active: white}
+.tooltip-module__Tooltip--YtcUH{position:absolute;background:var(--theme-bgc-invert);color:var(--theme-bgc);border-radius:var(--theme-border-radius);font-size:small;font-weight:normal;padding:.5em;pointer-events:none;z-index:1000}.tooltip-module__Tooltip--YtcUH:empty{display:none}.tooltip-module__Tooltip--YtcUH.tooltip-module__following--Qpt8D{position:fixed}.tooltip-module__Tooltip--YtcUH.tooltip-module__nowrap--tb9Lv{white-space:nowrap}.tooltip-module__Tooltip--YtcUH:not(.tooltip-module__following--Qpt8D).tooltip-module__left--tG61L{left:0}.tooltip-module__Tooltip--YtcUH:not(.tooltip-module__following--Qpt8D).tooltip-module__right--xjHhN{right:0}.tooltip-module__Tooltip--YtcUH:not(.tooltip-module__following--Qpt8D).tooltip-module__top--VpF0w{bottom:100%}.tooltip-module__Tooltip--YtcUH:not(.tooltip-module__following--Qpt8D).tooltip-module__bottom--or4AB{top:100%}.tooltip-module__Tooltip--YtcUH:not(.tooltip-module__following--Qpt8D).tooltip-module__center--KyElS{left:50%;transform:translateX(-50%)}
+.animate-module__Animate--CMGv9.opacity{opacity:0}.animate-module__Animate--CMGv9.opacity.enter{transition-property:opacity;transition-duration:100ms;opacity:1}.animate-module__Animate--CMGv9.opacity.leave{transition-duration:150ms;transition-timing-function:ease-out;opacity:0}.animate-module__Animate--CMGv9.slide-right{transform:translateX(100%);will-change:transform}.animate-module__Animate--CMGv9.slide-right.enter{transform:translateX(0);transition:transform 100ms;transition-timing-function:ease-in-out}.animate-module__Animate--CMGv9.slide-right.leave{transform:translateX(100%);transition:transform 150ms}.animate-module__Animate--CMGv9.opacity-scale{opacity:0}.animate-module__Animate--CMGv9.opacity-scale.enter{transition:opacity 250ms;opacity:1}.animate-module__Animate--CMGv9.opacity-scale.leave{will-change:opacity,transform;opacity:0;transform:scale(1.25);transition:transform 150ms ease-in,opacity 150ms ease-out}
+.xtranslate-icon-module__XTranslateIcon--O7hhS{--size: 16px;position:absolute;box-shadow:0 0 5px -1px #000 !important;background:#fff !important;padding:5px;border-radius:50%;cursor:pointer}.xtranslate-icon-module__XTranslateIcon--O7hhS:not(:hover) path{fill:#000}
+.popup-module__Popup--oEzoq{--theme-spacing: .6em;position:relative;padding:var(--theme-spacing);margin:var(--theme-spacing) 0;visibility:hidden;opacity:0;transition:opacity 100ms ease-out;transition-delay:100ms;line-height:normal;text-rendering:optimizeLegibility;-webkit-font-smoothing:antialiased}.popup-module__Popup--oEzoq.popup-module__fixedPos--_yVmx{position:fixed;margin:var(--theme-spacing)}.popup-module__Popup--oEzoq.popup-module__fixedPos--_yVmx.popup-module__leftTop--sbBt9{left:0;top:0}.popup-module__Popup--oEzoq.popup-module__fixedPos--_yVmx.popup-module__leftBottom--qaRgc{left:0;bottom:0}.popup-module__Popup--oEzoq.popup-module__fixedPos--_yVmx.popup-module__rightTop--qakBd{right:0;top:0}.popup-module__Popup--oEzoq.popup-module__fixedPos--_yVmx.popup-module__rightBottom--WkYUp{right:0;bottom:0}.popup-module__Popup--oEzoq.popup-module__visible--WqwbT{visibility:visible;opacity:1;z-index:10000 !important}.popup-module__Popup--oEzoq .popup-module__rtl--I4xRj{direction:rtl}.popup-module__Popup--oEzoq .popup-module__icon--GpRJB{--size: 1.6em;--bgc-active: none;width:auto;height:auto;opacity:.75;cursor:pointer;user-select:none;color:inherit !important;border-radius:0 !important;overflow:hidden}.popup-module__Popup--oEzoq .popup-module__icon--GpRJB:focus,.popup-module__Popup--oEzoq .popup-module__icon--GpRJB:hover{opacity:1}.popup-module__Popup--oEzoq .popup-module__translationResult--IxC84{--flex-gap: var(--theme-spacing-half);overflow:auto;overscroll-behavior:contain}.popup-module__Popup--oEzoq .popup-module__translationResult--IxC84::-webkit-scrollbar{width:calc(var(--theme-scrollbar-size) + 2px);height:calc(var(--theme-scrollbar-size) + 2px);background:rgba(0,0,0,0)}.popup-module__Popup--oEzoq .popup-module__translationResult--IxC84::-webkit-scrollbar-thumb{background:var(--theme-scrollbar-bgc);background-clip:padding-box;border:1px solid rgba(0,0,0,0);border-radius:calc(var(--theme-scrollbar-size) + 2px);--theme-scrollbar-size: .5em;--theme-scrollbar-bgc: none;border:1px solid}.popup-module__Popup--oEzoq .popup-module__translationResult--IxC84::-webkit-scrollbar-corner{background-color:rgba(0,0,0,0)}.popup-module__Popup--oEzoq .popup-module__translationResult--IxC84 .popup-module__translation--DRclF{display:flex;gap:var(--flex-gap)}.popup-module__Popup--oEzoq .popup-module__translationResult--IxC84 .popup-module__translation--DRclF .popup-module__value--AaqkU{padding:2px 0;flex:1 0}.popup-module__Popup--oEzoq .popup-module__translationResult--IxC84 .popup-module__translation--DRclF .popup-module__transcription--eyaKH{opacity:.75;font-style:normal}.popup-module__Popup--oEzoq .popup-module__translationResult--IxC84 .popup-module__dictionary--rVXlT{margin-top:var(--theme-spacing-half)}.popup-module__Popup--oEzoq .popup-module__translationResult--IxC84 .popup-module__dictionary--rVXlT .popup-module__wordType--F_wvr{font-weight:bold}.popup-module__Popup--oEzoq .popup-module__translationResult--IxC84 .popup-module__dictionary--rVXlT .popup-module__wordMeanings--xqlvq{padding-left:var(--theme-spacing)}.popup-module__Popup--oEzoq .popup-module__translationResult--IxC84 .popup-module__dictionary--rVXlT .popup-module__wordMeanings--xqlvq .popup-module__word--MS38w[title]{cursor:help}.popup-module__Popup--oEzoq .popup-module__translationError--EfYPm{display:flex;align-items:center;gap:var(--flex-gap)}.popup-module__Popup--oEzoq .popup-module__translationError--EfYPm .popup-module__errorInfo--dLTbg{flex:1}.popup-module__Popup--oEzoq .popup-module__translationError--EfYPm .popup-module__errorIcon--eE4Tr{pointer-events:none}.popup-module__Popup--oEzoq .popup-module__translationError--EfYPm a{font-style:italic}.popup-module__Popup--oEzoq a{color:inherit}.popup-module__Popup--oEzoq .popup-module__translatedFrom--egBk9{font-style:italic;margin-top:var(--theme-spacing);opacity:.75}.popup-module__iconTooltip--l5yar{z-index:100000 !important}
+</style><i class="icon-module__Icon--mJDq3 xtranslate-icon-module__XTranslateIcon--O7hhS icon-module__svg--Vvipk icon-module__interactive--jiTQl icon-module__focusable--l60fB icon-module__colorful--DPeih" tabindex="0" title="XTranslate: Auto-detect → Korean" style="display: none;"><span><!--?xml version="1.0" encoding="utf-8"?-->
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" xml:space="preserve">
+  <g>
+  <lineargradient id="SVGID_1_" gradientUnits="userSpaceOnUse" x1="0.3506" y1="64.6788" x2="128.3506" y2="64.6788">
+		<stop offset="0" style="stop-color:#662D91"></stop>
+    <stop offset="0.2591" style="stop-color:#7C2A90"></stop>
+    <stop offset="0.502" style="stop-color:#92278F"></stop>
+    <stop offset="1" style="stop-color:#9E1F63"></stop>
+	</lineargradient>
+    <path fill="url(#SVGID_1_)" d="M0.351,128.679v-32l32-32l-32-32v-32l64,64L0.351,128.679z M64.351,64.679l64,64v-32l-32-32l32-32
+		v-32L64.351,64.679z M64.351,96.679l-32,32h64L64.351,96.679z M64.351,32.679l32-32h-64L64.351,32.679z"></path>
+</g>
+</svg>
+</span></i><div class="popup-module__Popup--oEzoq" tabindex="-1" style="position: absolute; background: linear-gradient(rgb(0, 0, 0), rgba(98, 101, 101, 0.95)); border-radius: 5px; font-family: &quot;Open Sans&quot;, sans-serif; font-size: 15px; color: rgba(255, 255, 255, 0.85); border: 2px solid rgba(135, 144, 156, 0.5); box-shadow: rgba(102, 102, 102, 0.5) 0px 0px 10px;"></div></template></div></html>
