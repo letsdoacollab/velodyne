@@ -1,0 +1,265 @@
+/*
+Theme Name: TwentyTwelve-Child
+Description: A Child Theme of Twenty Twelve Theme
+Theme URI: http://www.none.com
+Author: David Butterworth
+Author URI: http://www.none.com
+Template: twentytwelve
+Version: 1.0.2
+*/
+
+/*
+Override theme's background color to white.
+Originally gray = #e6e6e6
+*/
+/* Minimum width of 960 pixels. */
+@media screen and (min-width: 960px) {
+        body {
+                background-color: #ffffff;
+        }
+}
+
+
+/* Show links as blue color, even after visited.
+Dark-black when mouse hover.
+gray: #9f9f9f
+
+Only seems to work with <div class="link" ... >
+*/
+.link a {
+    color: #21759b;
+}
+.link a:visited {
+    color: #21759b;
+}
+.link a:hover {
+    color: #0f3647;
+}
+
+
+/*
+Social Icons in top menu
+At device screen resolutions smaller than 600px the custom CSS is ignored
+and the social media links will be displayed as text links in the Twenty Twelve
+responsive menu.
+
+Email icon is on left.
+For some reason, if I put a sub-directory under 'images' I can't access it via the web.
+
+The left-to-right ordering of the icons is set in the Menu Editor GUI.
+*/
+@media (min-width: 600px) {
+
+.main-navigation .nav-social-email { 
+        float: right;  
+        margin-right: 0px; 
+        background: url(images/email.png) no-repeat right;
+}
+
+/*
+0p puts right-side in line with horizontal lines.
+-12px moves it out to the right
+*/
+.main-navigation .nav-social-linkedin { 
+        float: right;  
+        margin-right: 0px; 
+        background: url(images/linkedin.png) no-repeat right;
+}
+
+.main-navigation .nav-social-youtube { 
+        float: right;  
+        margin-right: 0px; 
+        background: url(images/youtube.png) no-repeat right;
+}
+
+.nav-social-email a {
+        opacity: 0;
+}
+
+.nav-social-linkedin a {
+        opacity: 0;
+}
+
+.nav-social-youtube a {
+        opacity: 0;
+}
+}
+
+
+/*
+Remove borders from top and bottom of table rows which is default in Theme
+
+order-bottom: 1px solid #ededed
+color: #757575
+*/
+.entry-content p {
+
+}
+.entry-content table,
+.comment-content table {
+        border-bottom: 0; /* 1px solid #ededed; */
+        color: #444; /* Same color as body text. Previously was #757575; */
+        font-size: 14px; /* 12px; */
+        font-size: 1rem; /* 0.857142857rem; */
+        line-height: 1.714285714; /* 2; */
+        margin: 0 0 24px;
+        margin: 0 0 1.714285714rem;
+        width: 100%;
+}
+.entry-content td,
+.comment-content td {
+        border-top: 0;  /* 1px solid #ededed; */
+        padding: 6px 10px 6px 0;
+}
+
+/*
+Date for the top of Blog posts.
+*/
+.entry-header .entry-timestamp {
+    margin-top: 6px;
+    font-size: 13px;
+    font-size: 0.928571429rem;
+    line-height: 1.846153846;
+    color: #757575;
+}
+
+/*
+Icon for PDF links
+*/
+a.pdf {
+  padding-left: 5px; /* Left of text link */
+  padding-right: 19px; /* Between link and icon */
+  background-position: right;
+  background-repeat: no-repeat;
+  background-image: url(http://www.davidbutterworth.net/images/icons/pdf_icon_16x16.gif);
+}
+
+
+/*
+Software page
+*/
+.software-block {
+    padding-bottom: 20px;
+}
+
+/* dot, python, link to github */
+.software-subtitle {
+    /* class="link" */
+    font-size: 12px;
+    line-height: 1.2;
+    padding-bottom: 10px; 
+}
+
+/*
+Icon for software language
+*/
+.software-language-dot {
+    position: relative;
+    top: 1px;
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.software-color-c {
+    background-color: #555555;
+}
+
+.software-color-cpp {
+    background-color: #f34b7d;
+}
+
+.software-color-python {
+    background-color: #3572a5;
+}
+
+.software-color-matlab {
+    background-color: #e16737;
+}
+
+.software-color-cmake {
+    background-color: #ccc;
+}
+
+/*
+Nested, numbered list
+*/
+
+
+/*
+With numbers right-aligned, like the default style
+*/
+/*
+ol {
+    counter-reset: item;
+}
+ol li {
+    display: block;
+    position: relative;
+}
+ol li:before {
+    content: counters(item, ".")".";
+    counter-increment: item;
+    position: absolute;
+    margin-right: 100%;
+    right: 10px;   Space between number and text
+}
+*/
+
+
+/*
+With trailing dot:
+1.
+2.
+ 2.1.
+ 2.2.
+*/
+ol.nested-ordered-list2 {
+  counter-reset: item;
+  margin-left: -10px;
+}
+ol.nested-ordered-list2 li {
+  display: block;
+}
+ol.nested-ordered-list2 li::before {
+  content: counters(item, ".") ". ";
+  counter-increment: item;
+}
+ol.nested-ordered-list2 ol {
+  counter-reset: item;
+  margin-left: -10px;
+
+}
+
+
+
+/*
+No trailing dot:
+1.
+2.
+ 2.1
+ 2.2
+*/
+ol.nested-ordered-list3 {
+  counter-reset: item;
+}
+ol.nested-ordered-list3 li {
+  display: block;
+}
+ol.nested-ordered-list3 li::before {
+  content: counters(item, ".") ". ";
+  counter-increment: item;
+}
+ol.nested-ordered-list3 ol {
+  counter-reset: item;
+}
+ol.nested-ordered-list3 ol > li {
+  display: block;
+}
+ol.nested-ordered-list3 ol > li::before {
+  content: counters(item, ".") " ";
+  counter-increment: item;
+}
+
+
